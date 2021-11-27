@@ -217,38 +217,56 @@ import {
         // get the object
         var test_obj = file_contents[i];
         if (test_obj.url == solid_url) {
-          // console.log("hi")
           continue;
         }
-        raw_name.push(test_obj.url)
+
+        short_name = test_obj.url.replace(solid_url,'');
+        raw_name.push(short_name)
 
         // access the file
         var file = await getFile(
           test_obj.url,               // File in Pod to Read
           { fetch: session.fetch }       // fetch from authenticated session
           );
-        var content_str = test_obj.url.replace(solid_url,'');
+        var content_str = short_name;
         content_str += await new Response(file).text()
         raw_text.push(content_str);
       }
-      // set_msg(raw_text)
 
       // pad the contents to be same length as others
-      var text = ""
+      var padded_binary = ""
+      var max_length = 0
+      var processed_string = []
       for (var i = 0; i < raw_text.length; i++) {
-        // text += raw_name[i] + `\n`;
-        unpadded = textToBinary(raw_text[i]);
-        unpadded += ' 00000000'
-        unpadded += get_padded(unpadded.length)
-        text += unpadded + `\n`;
+
+        var text = textToBinary(raw_text[i]);
+        text += ' 00000000';
+        if (text.length > max_length) {
+          max_length = text.length
+        }
+        processed_string.push(text)
       }
 
-      // console.log(text);
+      // permute the string and save the permutation order in a txt file.
+      for (var i = 0; i < processed_string.length; i++) {
+        processed_string[i] = get_padded(processed_string[i], max_length)
+        permuted_string = getPerm(processed_string[i])
+        
+      }
+
+
+      for (var i = 0; i < unpadded.length; i++) {
+
+        padded_binary += raw_name[i] + ":\r\n" + unpadded[i] + "\r\n";
+      }
+
+      // console.log(perm);
+      console.log(unpadded);
 
       // Write a file to the specified address
       targetFileURL = solid_url + "encryption.txt";
       // console.log(solid_url)
-      var file = new Blob([text], {type: "text/plain"});
+      var file = new Blob([padded_binary], {type: "text/plain"});
       try {
         await overwriteFile(
           targetFileURL,                                      // URL for the file.
@@ -269,6 +287,31 @@ import {
   }
 
 
+  function getPerm(text) {
+    text.replace(' ', '');
+    arr = [...Array(text.length).keys()]
+    return shuffle(arr);
+  }
+
+  function shuffle(array) {
+    let currentIndex = array.length,  randomIndex;
+  
+    // While there remain elements to shuffle...
+    while (currentIndex != 0) {
+  
+      // Pick a remaining element...
+      randomIndex = Math.floor(Math.random() * currentIndex);
+      currentIndex--;
+  
+      // And swap it with the current element.
+      [array[currentIndex], array[randomIndex]] = [
+        array[randomIndex], array[currentIndex]];
+    }
+  
+    return array;
+  }
+
+
   // Function to convert string to binary and pad the beginning of the string
   const textToBinary = (str = '') => {
     let result = [];
@@ -285,17 +328,17 @@ import {
   };
 
   // Function to pad the entire string with random binary to achieve same lengths
-  function get_padded(length) {
-    var x = 1600 - length
-    var ret = ""
-    while (x > 0) {
-      ret += ' ';
+  function get_padded(string, max_length) {
+    // var x = 1000 - length
+    // var ret = ""
+    while (string.length < max_length) {
+      string += ' ';
       for (var i = 0; i < 8; i++) {
-        ret += Math.round(Math.random());
+        string += Math.round(Math.random());
       }
-      x -= 9;
+      // x -= 9;
     }
-    return ret
+    return string
   }
 
   function set_msg(msg) {
