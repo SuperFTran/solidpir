@@ -104,6 +104,11 @@ import {
         x.setAttribute("display", "block")
         // get the object
         var test_obj = file_contents[i];
+
+        // Skip showing the parent container
+        if (test_obj.url == solid_url) {
+          continue;
+        }
         var obj_string = ''
         // get the url of the obj and detemrine if it is a file or container
         if (test_obj.url.endsWith('/')) {
@@ -135,7 +140,6 @@ import {
 
     // FOR OPENING FILES
     } else {
-      // var str = ""
       try {
         // file is a Blob (see https://developer.mozilla.org/docs/Web/API/Blob)
         const file = await getFile(
@@ -148,7 +152,7 @@ import {
         document.getElementById("results").textContent = str;
 
       } catch (err) {
-        str = err
+        console.log(err);
       }
     }
   }
@@ -156,26 +160,26 @@ import {
   // Creates an encryption.txt file with the text contents of all the files
   async function createEncryption() {
 
+    // This is the url in the input box
+    const solid_url = document.getElementById("solid_url").value;
+
     // Deletes encryption.txt if it already exists
     try {
       await deleteFile(
-        "https://alice.localhost:8443/public/encryption.txt",  // File to delete
+        solid_url + "encryption.txt",  // File to delete
         { fetch: session.fetch }                         // fetch function from authenticated session
       );
-      console.log("Deleted:: https://alice.localhost:8443/public/encryption.txt");
+      console.log("Deleted:: " + solid_url + "https://alice.localhost:8443/public/encryption.txt");
     } catch (err) {
-      console.error(err);
+      console.log("Doesnt exist");
     }
-
-    // This is the url in the input box
-    const solid_url = document.getElementById("solid_url").value;
 
     // Try to access the URL
     try {
       new URL(solid_url);
     } catch (_) {
       document.getElementById(
-        "results"
+        "msg"
       ).textContent = `Provided solid_url [${solid_url}] is not a valid URL - please try again`;
       return false;
     }
@@ -197,7 +201,7 @@ import {
       } catch (error) {
         // will show the appropriate error
         document.getElementById(
-          "results"
+          "msg"
         ).textContent = `Entered value [${solid_url}] is not valid. Error: [${error}]`;
         return false;
       }
@@ -213,7 +217,7 @@ import {
         // get the object
         var test_obj = file_contents[i];
         if (test_obj.url == solid_url) {
-          console.log("hi")
+          // console.log("hi")
           continue;
         }
         raw_name.push(test_obj.url)
@@ -223,42 +227,51 @@ import {
           test_obj.url,               // File in Pod to Read
           { fetch: session.fetch }       // fetch from authenticated session
           );
-        raw_text.push(await new Response(file).text());s
+        var content_str = test_obj.url.replace(solid_url,'');
+        content_str += await new Response(file).text()
+        raw_text.push(content_str);
       }
+      // set_msg(raw_text)
 
-        //
+      // pad the contents to be same length as others
       var text = ""
       for (var i = 0; i < raw_text.length; i++) {
-        text += raw_name[i] + `\n`;
+        // text += raw_name[i] + `\n`;
         unpadded = textToBinary(raw_text[i]);
         unpadded += ' 00000000'
         unpadded += get_padded(unpadded.length)
         text += unpadded + `\n`;
       }
 
-      console.log(text);
+      // console.log(text);
 
       // Write a file to the specified address
-      targetFileURL = "https://alice.localhost:8443/public/encryption.txt";
+      targetFileURL = solid_url + "encryption.txt";
+      // console.log(solid_url)
       var file = new Blob([text], {type: "text/plain"});
       try {
         await overwriteFile(
-          targetFileURL,                              // URL for the file.
-          file,                                       // File
+          targetFileURL,                                      // URL for the file.
+          file,                                               // File
           { contentType: file.type, fetch: session.fetch }    // mimetype if known, fetch from the authenticated session
         );
+        set_msg(`SUCCESS: Encryption in encryption.txt`);
       } catch (error) {
         console.error(error);
       }
     } else {
       console.error("URL is a file");
+      document.getElementById(
+        "msg"
+      ).textContent = `Cannot encrypt a file`;
     }
+    readSolidURL();
   }
 
 
   // Function to convert string to binary and pad the beginning of the string
   const textToBinary = (str = '') => {
-    let result = '';
+    let result = [];
     result = str.split('').map(char => {
        return char.charCodeAt(0).toString(2);
     })
@@ -271,8 +284,9 @@ import {
     return res;
   };
 
+  // Function to pad the entire string with random binary to achieve same lengths
   function get_padded(length) {
-    var x = 800 - length
+    var x = 1600 - length
     var ret = ""
     while (x > 0) {
       ret += ' ';
@@ -281,8 +295,60 @@ import {
       }
       x -= 9;
     }
-
     return ret
+  }
+
+  function set_msg(msg) {
+    document.getElementById(
+      "msg"
+    ).textContent = msg;
+  }
+
+
+  // Decrypt encryption.txt
+  async function decrypt() {
+    // This is the url in the input box
+    const solid_url = document.getElementById("solid_url").value;
+
+    // access the file
+    try {
+      var file = await getFile(
+        solid_url + "encryption.txt",               // File in Pod to Read
+        { fetch: session.fetch }       // fetch from authenticated session
+      );
+      raw_binary = await new Response(file).text()
+      name_and_contents = get_string(raw_binary)
+      var file_name = name_and_contents.substr(0, name_and_contents.indexOf('.ttl') + 4)
+      var contents = name_and_contents.replace(file_name, '')
+      var file = new Blob([contents], {type: "text/turtle"});
+      try {
+        await overwriteFile(
+          solid_url + "/blah/" + file_name,                                      // URL for the file.
+          file,                                               // File
+          { contentType: file.type, fetch: session.fetch }    // mimetype if known, fetch from the authenticated session
+        );
+        set_msg(`SUCCESS: Decryption in whatevr`);
+      } catch (error) {
+        console.error(error);
+      }
+      
+    } catch(error) {
+      console.error(error);
+    }
+  }
+
+  // converts binary to string
+  function get_string(raw_binary) {
+
+    binary_array = raw_binary.split(" ")
+    ret = ""
+    for (var i = 0; i < binary_array.length; i++) {
+      if (binary_array[i] == '00000000') {
+        return ret
+      }
+      ret += String.fromCharCode(parseInt(binary_array[i], 2))
+    }
+    return ret;
   }
 
 
@@ -297,6 +363,10 @@ import {
 
   btnEncrypt.onclick = function () {
     createEncryption();
+  };
+
+  btnDecrypt.onclick = function () {
+    decrypt();
   };
 
   readForm.addEventListener("submit", (event) => {
