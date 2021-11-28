@@ -6,14 +6,13 @@ import {
     getContentType,
     isRawData,
     overwriteFile,
-    setUrl,
-    setStringNoLocale,
-    getThing,
-    setThing
   } from "@inrupt/solid-client";
+  import {
+    getPerm,
+    textToBinary,
+    get_padded
+  } from './helper.mjs';
   import { Session} from "@inrupt/solid-client-authn-browser";
-  import { SCHEMA_INRUPT } from "@inrupt/vocab-common-rdf";
-  import { VCARD } from "@inrupt/vocab-common-rdf";
 
   // SET VARIABLES
   const SOLID_IDENTITY_PROVIDER = "https://localhost:8443/";
@@ -24,6 +23,7 @@ import {
   const session = new Session();
   const buttonLogin = document.getElementById("btnLogin");
   const readForm = document.getElementById("readForm");
+  const pod_url = "https://alice.localhost:8443/public/"
   var docFrag = document.createDocumentFragment();
 
 
@@ -127,7 +127,6 @@ import {
             document.getElementById("btnBack").value = (' ' + document.getElementById("solid_url").value).slice(1);
             document.getElementById("solid_url").value = file.url
             readSolidURL();
-            console.log(file.url)
           })
         })(i)
 
@@ -162,17 +161,14 @@ import {
 
     // This is the url in the input box
     const solid_url = document.getElementById("solid_url").value;
-
-    // Deletes encryption.txt if it already exists
-    try {
-      await deleteFile(
-        solid_url + "encryption.txt",  // File to delete
-        { fetch: session.fetch }                         // fetch function from authenticated session
-      );
-      console.log("Deleted:: " + solid_url + "https://alice.localhost:8443/public/encryption.txt");
-    } catch (err) {
-      console.log("Doesnt exist");
-    }
+    var targetFileURL = solid_url + "encryption.txt";
+    deleteFile(targetFileURL);
+    // targetFileURL = solid_url + "permutation.txt";
+    // // deleteFile(targetFileURL);
+    // targetFileURL = solid_url + "sample.txt";
+    // deleteFile(targetFileURL);
+    // targetFileURL = "https://alice.localhost:8443/public/blah/"
+    // deleteFile(targetFileURL);
 
     // Try to access the URL
     try {
@@ -187,7 +183,7 @@ import {
     // Create the URL object
     const solid_url_obj = new URL(solid_url);
 
-    // If the URL ends in '/' that means that we want to read a container. Therefore 
+    // If the URL ends in '/' that means that we want to read a container. Therefore
     // we will try to get the folder contents using a Solid Dataset
     if (solid_url.endsWith('/')) {
       let myDataset;
@@ -233,50 +229,52 @@ import {
         raw_text.push(content_str);
       }
 
-      // pad the contents to be same length as others
-      var padded_binary = ""
+      // add the '00000000' indicator for end of actual string and
+      // find the length of the longest string
+      var padded_permuted_binary = ""
       var max_length = 0
       var processed_string = []
       for (var i = 0; i < raw_text.length; i++) {
-
         var text = textToBinary(raw_text[i]);
-        text += ' 00000000';
+        text += '00000000';
         if (text.length > max_length) {
           max_length = text.length
         }
         processed_string.push(text)
       }
 
+      // get the permutations I need
+      var permutation_array = getPerm(processed_string[0].length, processed_string.length)
+      var permutation_text = ""
+
+      for (var i = 0; i < permutation_array.length; i++) {
+        permutation_text += permutation_array[i] + "\r\n"
+      }
+
+      // write the permutations
+      var targetFileURL = pod_url + "permutation.txt";
+      writeToFile(targetFileURL, permutation_text, "text/plain");
+
+      // pad the strings to the max length (same length) and create
+      // a permutation order for each string and save it
       // permute the string and save the permutation order in a txt file.
       for (var i = 0; i < processed_string.length; i++) {
         processed_string[i] = get_padded(processed_string[i], max_length)
-        permuted_string = getPerm(processed_string[i])
-        
+        processed_string[i] = permute(processed_string[i], permutation_array[i])
       }
 
+      targetFileURL = pod_url + "sample.txt";
+      writeToFile(targetFileURL, processed_string[0], "text/plain");
 
-      for (var i = 0; i < unpadded.length; i++) {
 
-        padded_binary += raw_name[i] + ":\r\n" + unpadded[i] + "\r\n";
+      for (var i = 0; i < processed_string.length; i++) {
+
+        padded_permuted_binary += raw_name[i] + ":\r\n" + processed_string[i] + "\r\n";
       }
 
-      // console.log(perm);
-      console.log(unpadded);
+      targetFileURL = pod_url + "encryption.txt";
+      writeToFile(targetFileURL, padded_permuted_binary, "text/plain");
 
-      // Write a file to the specified address
-      targetFileURL = solid_url + "encryption.txt";
-      // console.log(solid_url)
-      var file = new Blob([padded_binary], {type: "text/plain"});
-      try {
-        await overwriteFile(
-          targetFileURL,                                      // URL for the file.
-          file,                                               // File
-          { contentType: file.type, fetch: session.fetch }    // mimetype if known, fetch from the authenticated session
-        );
-        set_msg(`SUCCESS: Encryption in encryption.txt`);
-      } catch (error) {
-        console.error(error);
-      }
     } else {
       console.error("URL is a file");
       document.getElementById(
@@ -286,59 +284,43 @@ import {
     readSolidURL();
   }
 
-
-  function getPerm(text) {
-    text.replace(' ', '');
-    arr = [...Array(text.length).keys()]
-    return shuffle(arr);
+  function permute(string, perm_order) {
+    // console.log(string)
+    // console.log(perm_order)
+    var ret = "";
+    for (var i = 0; i < perm_order.length; i++) {
+      ret += string[perm_order[i]];
+    }
+    console.log(ret)
+    return ret;
   }
 
-  function shuffle(array) {
-    let currentIndex = array.length,  randomIndex;
-  
-    // While there remain elements to shuffle...
-    while (currentIndex != 0) {
-  
-      // Pick a remaining element...
-      randomIndex = Math.floor(Math.random() * currentIndex);
-      currentIndex--;
-  
-      // And swap it with the current element.
-      [array[currentIndex], array[randomIndex]] = [
-        array[randomIndex], array[currentIndex]];
+  // Deletes the file at the target URL
+  async function deleteFile(targetFileURL) {
+     try {
+      await deleteFile(
+        targetFileURL,    // File to delete
+        { fetch: session.fetch }                 // fetch function from authenticated session
+      );
+      set_msg("Deleted:: " + targetFileURL);
+    } catch (err) {
+      set_msg("Doesnt exist");
     }
-  
-    return array;
   }
 
-
-  // Function to convert string to binary and pad the beginning of the string
-  const textToBinary = (str = '') => {
-    let result = [];
-    result = str.split('').map(char => {
-       return char.charCodeAt(0).toString(2);
-    })
-
-    for (var i = 0; i < result.length; i++) {
-      result[i] = result[i].padStart(8, '0');
+  // Write a file to the specified address
+  async function writeToFile(targetFileURL, data, text_type) {
+    var file = new Blob([data], {type: text_type});
+    try {
+      await overwriteFile(
+        targetFileURL,                                      // URL for the file.
+        file,                                               // File
+        { contentType: file.type, fetch: session.fetch }    // mimetype if known, fetch from the authenticated session
+      );
+      set_msg(`SUCCESS: Encryption in encryption.txt`);
+    } catch (error) {
+      console.error(error);
     }
-
-    let res = result.join(' ');
-    return res;
-  };
-
-  // Function to pad the entire string with random binary to achieve same lengths
-  function get_padded(string, max_length) {
-    // var x = 1000 - length
-    // var ret = ""
-    while (string.length < max_length) {
-      string += ' ';
-      for (var i = 0; i < 8; i++) {
-        string += Math.round(Math.random());
-      }
-      // x -= 9;
-    }
-    return string
   }
 
   function set_msg(msg) {
@@ -347,43 +329,81 @@ import {
     ).textContent = msg;
   }
 
+  async function readFile(targetFileURL) {
+    try {
+      var file = await getFile(
+        targetFileURL,               // File in Pod to Read
+        { fetch: session.fetch }       // fetch from authenticated session
+      );
+      var str = ""
+      str += await new Response(file).text()
+      // console.log(str)
+      return str;
+    } catch(err) {
+      set_msg(err);
+    }
+  }
+
 
   // Decrypt encryption.txt
   async function decrypt() {
     // This is the url in the input box
-    const solid_url = document.getElementById("solid_url").value;
-
-    // access the file
+    // const solid_url = document.getElementById("solid_url").value;
+    var targetFileURL = pod_url + "sample.txt";
     try {
       var file = await getFile(
-        solid_url + "encryption.txt",               // File in Pod to Read
+        targetFileURL,               // File in Pod to Read
         { fetch: session.fetch }       // fetch from authenticated session
       );
-      raw_binary = await new Response(file).text()
-      name_and_contents = get_string(raw_binary)
+      var sample_str = ""
+      sample_str += await new Response(file).text()
+    } catch(err) {
+      set_msg(err);
+    }
+    // var raw_binary = readFile(targetFileURL);
+
+    targetFileURL = pod_url + "permutation.txt";
+    try {
+      var file = await getFile(
+        targetFileURL,               // File in Pod to Read
+        { fetch: session.fetch }       // fetch from authenticated session
+      );
+      var perm_str = ""
+      perm_str += await new Response(file).text()
+      unpermuted_str = unpermute(sample_str, perm_str)
+      name_and_contents = get_string(unpermuted_str);
       var file_name = name_and_contents.substr(0, name_and_contents.indexOf('.ttl') + 4)
       var contents = name_and_contents.replace(file_name, '')
-      var file = new Blob([contents], {type: "text/turtle"});
-      try {
-        await overwriteFile(
-          solid_url + "/blah/" + file_name,                                      // URL for the file.
-          file,                                               // File
-          { contentType: file.type, fetch: session.fetch }    // mimetype if known, fetch from the authenticated session
-        );
-        set_msg(`SUCCESS: Decryption in whatevr`);
-      } catch (error) {
-        console.error(error);
-      }
-      
-    } catch(error) {
-      console.error(error);
+
+      targetFileURL = pod_url + file_name;
+      writeToFile(targetFileURL, contents, "text/turtle");
+      set_msg("decrypted");
+    } catch(err) {
+      set_msg(err);
     }
+
+    readSolidURL();
   }
+
+  function unpermute(sample_str, perm_str) {
+    var perm_arr = perm_str.split(',');
+    var sample_arr = sample_str.split();
+
+    for (var i = 0; i < sample_str.length; i++) {
+        sample_arr[parseInt(perm_arr[i])] = sample_str[i];
+    }
+    var ret = sample_arr.join().replaceAll(',','');
+
+    return ret;
+  }
+
 
   // converts binary to string
   function get_string(raw_binary) {
 
-    binary_array = raw_binary.split(" ")
+    console.log(raw_binary);
+    var binary_array = chunkString(String(raw_binary), 8);
+
     ret = ""
     for (var i = 0; i < binary_array.length; i++) {
       if (binary_array[i] == '00000000') {
@@ -393,6 +413,11 @@ import {
     }
     return ret;
   }
+
+  function chunkString(str, length) {
+    return str.match(new RegExp('.{1,' + length + '}', 'g'));
+  }
+
 
 
   buttonLogin.onclick = function () {
