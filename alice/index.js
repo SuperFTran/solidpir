@@ -329,27 +329,13 @@ import {
     ).textContent = msg;
   }
 
-  async function readFile(targetFileURL) {
-    try {
-      var file = await getFile(
-        targetFileURL,               // File in Pod to Read
-        { fetch: session.fetch }       // fetch from authenticated session
-      );
-      var str = ""
-      str += await new Response(file).text()
-      // console.log(str)
-      return str;
-    } catch(err) {
-      set_msg(err);
-    }
-  }
-
 
   // Decrypt encryption.txt
   async function decrypt() {
     // This is the url in the input box
     // const solid_url = document.getElementById("solid_url").value;
-    var targetFileURL = pod_url + "sample.txt";
+    // var targetFileURL = pod_url + "sample.txt";
+    var targetFileURL = pod_url + "double_encrypt.txt";
     try {
       var file = await getFile(
         targetFileURL,               // File in Pod to Read
@@ -371,12 +357,14 @@ import {
       var perm_str = ""
       perm_str += await new Response(file).text()
       unpermuted_str = unpermute(sample_str, perm_str)
-      name_and_contents = get_string(unpermuted_str);
-      var file_name = name_and_contents.substr(0, name_and_contents.indexOf('.ttl') + 4)
-      var contents = name_and_contents.replace(file_name, '')
+      // name_and_contents = get_string(unpermuted_str);
+      // var file_name = name_and_contents.substr(0, name_and_contents.indexOf('.ttl') + 4)
+      // var contents = name_and_contents.replace(file_name, '')
 
-      targetFileURL = pod_url + file_name;
-      writeToFile(targetFileURL, contents, "text/turtle");
+      // targetFileURL = pod_url + file_name;
+      targetFileURL = pod_url + "decrypted_alice.txt";
+      // writeToFile(targetFileURL, contents, "text/turtle");
+      writeToFile(targetFileURL, unpermuted_str, "text/turtle");
       set_msg("decrypted");
     } catch(err) {
       set_msg(err);
@@ -386,12 +374,18 @@ import {
   }
 
   function unpermute(sample_str, perm_str) {
+
     var perm_arr = perm_str.split(',');
-    var sample_arr = sample_str.split();
+    // var sample_arr = sample_str.split();
+    var sample_str = chunkString(sample_str, 8);
+    var sample_arr = JSON.parse(JSON.stringify(sample_str))
+    console.log(sample_arr);
+    // console.log(sample_str);
 
     for (var i = 0; i < sample_str.length; i++) {
         sample_arr[parseInt(perm_arr[i])] = sample_str[i];
     }
+    console.log(sample_arr);
     var ret = sample_arr.join().replaceAll(',','');
 
     return ret;

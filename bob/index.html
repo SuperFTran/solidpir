@@ -36,7 +36,7 @@
              id="solid_url"
              name="webID"
              size="50"
-             value="https://testing.localhost:8443/"
+             value="https://alice.localhost:8443/public/"
            />
            <button type="submit" name="btnRead" id="btnRead">
              Read
@@ -50,9 +50,17 @@
 
       <dl class="display">
         <dt>Results:&nbsp</dt>
-        <dd id="testing"></dd>
+        <dd id="results"></dd>
       </dl>
-      <p id="results2" class="labelStatus"></p>
+      <p id="msg" class="labelStatus"></p>
+
+      <button type="submit" name="btnEncrypt" id="btnEncrypt">
+        Encrypt
+      </button>
+
+      <button type="submit" name="btnDecrypt" id="btnDecrypt">
+        Decrypt
+      </button>
       </section>
 
    </body>
