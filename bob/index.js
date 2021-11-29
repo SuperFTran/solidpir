@@ -74,7 +74,7 @@ import {
     // Create the URL object
     const solid_url_obj = new URL(solid_url);
 
-    // If the URL ends in '/' that means that we want to read a container. Therefore 
+    // If the URL ends in '/' that means that we want to read a container. Therefore
     // we will try to get the folder contents using a Solid Dataset
     if (solid_url.endsWith('/')) {
       let myDataset;
@@ -144,10 +144,10 @@ import {
           solid_url,               // File in Pod to Read
           { fetch: session.fetch }       // fetch from authenticated session
         );
-        var str = `Fetched a ${getContentType(file)} file from ${solid_url}.\n`;
-        str += `The file is ${isRawData(file) ? "not " : ""}a dataset.\n`;
+        var str = `Fetched a ${getContentType(file)} file from ${solid_url}.<br>`;
+        str += `The file is ${isRawData(file) ? "not " : ""}a dataset.<br>`;
         str += await new Response(file).text()
-        document.getElementById("results").textContent = str;
+        document.getElementById("results").innerHTML = str;
 
       } catch (err) {
         console.log(err);
@@ -155,25 +155,22 @@ import {
     }
   }
 
-  // Creates private_bob_binary.txt and private_bob_zeros.txt
+  // Creates private_sub_key.txt and private_bob_zeros.txt
   async function createEncryption() {
 
-    // This is the url in the input box
-    const solid_url = document.getElementById("solid_url").value;
 
-    // var targetFileURL = public_url + "bobencrypt.txt";
-    // deleteFile(targetFileURL);
-
+    console.log("Creating random binary allocation private key...");
     // Create 256 length array with equal amounts of ones and zeros
     // in random order
     var ones_and_zeros = createOnesAndZeros();
     var ones_and_zeros_str = ones_and_zeros.join().replaceAll(',','');
-    // console.log(ones_and_zeros);
 
-    targetFileURL = private_url + "private_bob_binary.txt";
+
+    targetFileURL = private_url + "private_sub_key.txt";
     writeToFile(targetFileURL, ones_and_zeros_str, "text/plain");
+    console.log("Done: Saved in 'private_sub_key.txt'");
 
-    // console.log(ones_and_zeros);
+    console.log("Encrypting 'permuted.txt'...");
     var zero_indices = getAllIndexes(ones_and_zeros, 0);
     var ones_indices = getAllIndexes(ones_and_zeros, 1);
 
@@ -182,8 +179,7 @@ import {
       ones_indices[i] = ones_indices[i].toString(2).padStart(8, '0');;
     }
 
-
-    targetFileURL = private_url + "sample.txt";
+    targetFileURL = private_url + "permuted.txt";
     // access the file
     var file = await getFile(
       targetFileURL,               // File in Pod to Read
@@ -191,10 +187,8 @@ import {
       );
     var content_str = "";
     content_str += await new Response(file).text();
-    console.log(content_str);
-    content_arr = content_str.split('');
-    console.log(content_arr);
-    map_arr = [];
+    var content_arr = content_str.split('');
+    var map_arr = [];
 
     for (var i = 0; i < content_arr.length; i++) {
       if (content_arr[i] == 0) {
@@ -202,24 +196,23 @@ import {
       } else {
         var rand_num = ones_indices[Math.floor(Math.random()*zero_indices.length)];
       }
-      // bin_rand = rand_num.toString(2).padStart(8, '0');
       map_arr.push(rand_num);
     }
 
-    // console.log(map_arr)
-    var double_encrypt = map_arr.join().replaceAll(',','');
-    targetFileURL = public_url + "double_encrypt.txt";
-    writeToFile(targetFileURL, double_encrypt, "text/plain");
-
+    var permuted_subbed = map_arr.join().replaceAll(',','');
+    targetFileURL = public_url + "permuted_subbed.txt";
+    writeToFile(targetFileURL, permuted_subbed, "text/plain");
+    console.log("Done: Created 'permuted_subbed.txt'");
+    set_msg("Done: Created 'permuted_subbed.txt'");
     readSolidURL();
   }
 
 
-  // Decrypt double_encrypt
+  // Decrypt unpermuted_subbed.txt
   async function decrypt() {
     // This is the url in the input box
-    // const solid_url = document.getElementById("solid_url").value;
-    var targetFileURL = public_url + "decrypted_alice.txt";
+    console.log("Decrypting 'unpermuted_subbed.txt'...");
+    var targetFileURL = public_url + "unpermuted_subbed.txt";
     try {
       var file = await getFile(
         targetFileURL,               // File in Pod to Read
@@ -233,11 +226,8 @@ import {
 
     var diff_encrypts = sample_str.split('/');
 
-    console.log(diff_encrypts);
-    // var raw_binary = readFile(targetFileURL);
-
     for (var i = 0; i < diff_encrypts.length; i++) {
-      targetFileURL = private_url + "private_bob_binary.txt";
+      targetFileURL = private_url + "private_sub_key.txt";
       try {
         var file = await getFile(
           targetFileURL,               // File in Pod to Read
@@ -251,15 +241,15 @@ import {
         if (name_and_contents.includes('.ttl')) {
           var file_name = name_and_contents.substr(0, name_and_contents.indexOf('.ttl') + 4)
           var contents = name_and_contents.replace(file_name, '')
-  
           targetFileURL = private_url + file_name;
           writeToFile(targetFileURL, contents, "text/turtle");
+          console.log("Done: File saved in your private folder :)");
         }
       } catch(err) {
         set_msg(err);
       }
     }
-
+    set_msg("Done: File saved in your private folder :)");
     readSolidURL();
   }
 
@@ -314,7 +304,6 @@ import {
         file,                                               // File
         { contentType: file.type, fetch: session.fetch }    // mimetype if known, fetch from the authenticated session
       );
-      set_msg(`SUCCESS: Encryption in encryption.txt`);
     } catch (error) {
       console.error(error);
     }
@@ -324,7 +313,6 @@ import {
     ones = new Array(128).fill(1);
     zeros = new Array(128).fill(0);
     comb = ones.concat(zeros);
-    // console.log(comb);
     return shuffle(comb);
   }
 

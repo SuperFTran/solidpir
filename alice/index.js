@@ -146,10 +146,10 @@ import {
           solid_url,               // File in Pod to Read
           { fetch: session.fetch }       // fetch from authenticated session
         );
-        var str = `Fetched a ${getContentType(file)} file from ${solid_url}.\n`;
-        str += `The file is ${isRawData(file) ? "not " : ""}a dataset.\n`;
+        var str = `Fetched a ${getContentType(file)} file from ${solid_url}.<br>`;
+        str += `The file is ${isRawData(file) ? "not " : ""}a dataset.<br>`;
         str += await new Response(file).text()
-        document.getElementById("results").textContent = str;
+        document.getElementById("results").innerHTML = str;
 
       } catch (err) {
         console.log(err);
@@ -162,13 +162,7 @@ import {
 
     // This is the url in the input box
     const solid_url = document.getElementById("solid_url").value;
-    
-    // targetFileURL = solid_url + "permutation.txt";
-    // // deleteFile(targetFileURL);
-    // targetFileURL = solid_url + "sample.txt";
-    // deleteFile(targetFileURL);
-    // targetFileURL = "https://alice.localhost:8443/public/blah/"
-    // deleteFile(targetFileURL);
+
 
     // Try to access the URL
     try {
@@ -206,6 +200,7 @@ import {
       // Read each item contents and add it to an array
       // raw_name stores the urls of the files in an array
       // raw_text stores the contents of the files in an array
+      console.log("Reading folder contents...");
       const file_contents = getThingAll(myDataset);
       var raw_name = []
       var raw_text = []
@@ -229,6 +224,7 @@ import {
         raw_text.push(content_str);
       }
 
+      console.log("Padding binary strings...");
       // add the '00000000' indicator for end of actual string and
       // find the length of the longest string
       var padded_permuted_binary = ""
@@ -244,6 +240,7 @@ import {
       }
 
       // get the permutations I need
+      console.log("Creating private key...");
       var permutation_array = getPerm(processed_string[0].length, processed_string.length)
       var permutation_text = ""
 
@@ -255,25 +252,27 @@ import {
       }
 
       // write the permutations
-      var targetFileURL = private_url + "permutation.txt";
+      var targetFileURL = private_url + "private_perm_key.txt";
       writeToFile(targetFileURL, permutation_text, "text/plain");
+      console.log("Done: Saved permutation private key in 'private_perm_key.txt'");
 
       // pad the strings to the max length (same length) and create
       // a permutation order for each string and save it
       // permute the string and save the permutation order in a txt file.
+      console.log("Encrypting with private key...");
       for (var i = 0; i < processed_string.length; i++) {
         processed_string[i] = get_padded(processed_string[i], max_length)
         processed_string[i] = permute(processed_string[i], permutation_array[i])
       }
 
-
       for (var i = 0; i < processed_string.length; i++) {
-
-        padded_permuted_binary += raw_name[i] + ":\r\n" + processed_string[i] + "\r\n";
+        padded_permuted_binary += "<br>" + raw_name[i] + ":\r\n" + processed_string[i] + "<br>";
       }
 
-      targetFileURL = public_url + "encryption.txt";
+      targetFileURL = public_url + "all_permuted.txt";
       writeToFile(targetFileURL, padded_permuted_binary, "text/plain");
+      console.log("Done: Saved encrypted file 'all_permuted.txt'");
+      set_msg("Done: Saved encrypted file 'all_permuted.txt'");
 
     } else {
       console.error("URL is a file");
@@ -317,7 +316,6 @@ import {
         file,                                               // File
         { contentType: file.type, fetch: session.fetch }    // mimetype if known, fetch from the authenticated session
       );
-      set_msg(`SUCCESS: Encryption in encryption.txt`);
     } catch (error) {
       console.error(error);
     }
@@ -330,23 +328,24 @@ import {
   }
 
 
-  // Decrypt encryption.txt
+  // Decrypt permuted_subbed.txt
   async function decrypt() {
-
-    var targetFileURL = public_url + "double_encrypt.txt";
+    console.log("Retrieving 'permuted_subbed.txt'...");
+    var targetFileURL = public_url + "permuted_subbed.txt";
     try {
       var file = await getFile(
         targetFileURL,               // File in Pod to Read
         { fetch: session.fetch }       // fetch from authenticated session
       );
       var sample_str = ""
-      sample_str += await new Response(file).text()
+      sample_str += await new Response(file).text();
+      console.log("Done");
     } catch(err) {
       set_msg(err);
     }
-    // var raw_binary = readFile(targetFileURL);
 
-    targetFileURL = private_url + "permutation.txt";
+    console.log("Decrypting with 'private_perm_key.txt'...")
+    targetFileURL = private_url + "private_perm_key.txt";
     try {
       var file = await getFile(
         targetFileURL,               // File in Pod to Read
@@ -363,10 +362,8 @@ import {
       for (var i = 0; i < perm_arr.length; i += chunk) {
         var temporary = perm_arr.slice(i, i + chunk);
         diff_perms.push(JSON.parse(JSON.stringify(temporary)));
-        // do whatever
       }
 
-      console.log(diff_perms);
       var unpermuted_str = "";
 
       for (var i = 0; i < diff_perms.length; i++) {
@@ -375,13 +372,11 @@ import {
           unpermuted_str += '/';
         }
       }
-      
-      // console.log(unpermuted_str)
-  
-      targetFileURL = public_url + "decrypted_alice.txt";
-      // writeToFile(targetFileURL, contents, "text/turtle");
+
+      targetFileURL = public_url + "unpermuted_subbed.txt";
       writeToFile(targetFileURL, unpermuted_str, "text/turtle");
-      set_msg("decrypted");
+      console.log("Done: Saved in 'unpermuted_subbed.txt'");
+      set_msg("Done: Saved in 'unpermuted_subbed.txt'");
     } catch(err) {
       set_msg(err);
     }
@@ -390,36 +385,16 @@ import {
   }
 
   function unpermute(sample_str, perm_arr) {
-    // console.log(perm_str);
-    console.log(perm_arr);
-    // var sample_arr = sample_str.split();
+
     var sample_str = chunkString(sample_str, 8);
     var sample_arr = JSON.parse(JSON.stringify(sample_str))
-    // console.log(sample_arr);
 
     for (var i = 0; i < sample_str.length; i++) {
         sample_arr[parseInt(perm_arr[i])] = sample_str[i];
     }
-    console.log(sample_arr);
+
     var ret = sample_arr.join().replaceAll(',','');
 
-    return ret;
-  }
-
-
-  // converts binary to string
-  function get_string(raw_binary) {
-
-    console.log(raw_binary);
-    var binary_array = chunkString(String(raw_binary), 8);
-
-    ret = ""
-    for (var i = 0; i < binary_array.length; i++) {
-      if (binary_array[i] == '00000000') {
-        return ret
-      }
-      ret += String.fromCharCode(parseInt(binary_array[i], 2))
-    }
     return ret;
   }
 
@@ -427,20 +402,18 @@ import {
     return str.match(new RegExp('.{1,' + length + '}', 'g'));
   }
 
-  // Creates an encryption.txt file with the text contents of all the files
+  // Deletes unnecessary files
   async function reset() {
-    var targetFileURL = public_url + "encryption.txt";
+    var targetFileURL = public_url + "all_permuted.txt";
     deleteFile(targetFileURL);
-    targetFileURL = public_url + "decrypted_alice.txt";
+    targetFileURL = public_url + "unpermuted_subbed.txt";
     deleteFile(targetFileURL);
-    targetFileURL = public_url + "double_encrypt.txt";
+    targetFileURL = public_url + "permuted_subbed.txt";
     deleteFile(targetFileURL);
-    targetFileURL = private_url + "permutation.txt";
+    targetFileURL = private_url + "private_perm_key.txt";
     deleteFile(targetFileURL);
     readSolidURL();
   }
-
-
 
   buttonLogin.onclick = function () {
     login();
