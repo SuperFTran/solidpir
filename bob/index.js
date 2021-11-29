@@ -21,7 +21,8 @@ import {
   const session = new Session();
   const buttonLogin = document.getElementById("btnLogin");
   const readForm = document.getElementById("readForm");
-  const pod_url = "https://alice.localhost:8443/public/";
+  const public_url = "https://alice.localhost:8443/public/";
+  const private_url = "https://bobunsw.solidcommunity.net/private/";
   var docFrag = document.createDocumentFragment();
 
 
@@ -45,7 +46,7 @@ import {
         "labelStatus"
       ).innerHTML = `Your session is logged in with the WebID [<a target="_blank" href="${session.info.webId}">${session.info.webId}</a>].`;
       document.getElementById("labelStatus").setAttribute("role", "alert");
-      document.getElementById("solid_url").value = session.info.webId;
+      // document.getElementById("solid_url").value = session.info.webId;
     }
   }
 
@@ -160,8 +161,8 @@ import {
     // This is the url in the input box
     const solid_url = document.getElementById("solid_url").value;
 
-    var targetFileURL = pod_url + "bobencrypt.txt";
-    deleteFile(targetFileURL);
+    // var targetFileURL = public_url + "bobencrypt.txt";
+    // deleteFile(targetFileURL);
 
     // Create 256 length array with equal amounts of ones and zeros
     // in random order
@@ -169,7 +170,7 @@ import {
     var ones_and_zeros_str = ones_and_zeros.join().replaceAll(',','');
     // console.log(ones_and_zeros);
 
-    targetFileURL = pod_url + "private_bob_binary.txt";
+    targetFileURL = private_url + "private_bob_binary.txt";
     writeToFile(targetFileURL, ones_and_zeros_str, "text/plain");
 
     // console.log(ones_and_zeros);
@@ -181,12 +182,8 @@ import {
       ones_indices[i] = ones_indices[i].toString(2).padStart(8, '0');;
     }
 
-    // var zero_indices_str = zero_indices.join().replaceAll(',','');
-    // targetFileURL = pod_url + "private_bob_zeros.txt";
-    // writeToFile(targetFileURL, zero_indices_str, "text/plain");
-    // console.log(indexes);
 
-    targetFileURL = pod_url + "sample.txt";
+    targetFileURL = private_url + "sample.txt";
     // access the file
     var file = await getFile(
       targetFileURL,               // File in Pod to Read
@@ -211,7 +208,7 @@ import {
 
     // console.log(map_arr)
     var double_encrypt = map_arr.join().replaceAll(',','');
-    targetFileURL = pod_url + "double_encrypt.txt";
+    targetFileURL = public_url + "double_encrypt.txt";
     writeToFile(targetFileURL, double_encrypt, "text/plain");
 
     readSolidURL();
@@ -222,7 +219,7 @@ import {
   async function decrypt() {
     // This is the url in the input box
     // const solid_url = document.getElementById("solid_url").value;
-    var targetFileURL = pod_url + "decrypted_alice.txt";
+    var targetFileURL = public_url + "decrypted_alice.txt";
     try {
       var file = await getFile(
         targetFileURL,               // File in Pod to Read
@@ -233,27 +230,34 @@ import {
     } catch(err) {
       set_msg(err);
     }
+
+    var diff_encrypts = sample_str.split('/');
+
+    console.log(diff_encrypts);
     // var raw_binary = readFile(targetFileURL);
 
-    targetFileURL = pod_url + "private_bob_binary.txt";
-    try {
-      var file = await getFile(
-        targetFileURL,               // File in Pod to Read
-        { fetch: session.fetch }       // fetch from authenticated session
-      );
-      var bin_nums = ""
-      bin_nums += await new Response(file).text();
-      bin_str = binify(sample_str, bin_nums);
-      var name_and_contents = get_string(bin_str);
-      console.log(name_and_contents);
-      var file_name = name_and_contents.substr(0, name_and_contents.indexOf('.ttl') + 4)
-      var contents = name_and_contents.replace(file_name, '')
-
-      targetFileURL = pod_url + file_name;
-      // targetFileURL = pod_url + "decrypted_alice.txt";
-      writeToFile(targetFileURL, contents, "text/turtle");
-    } catch(err) {
-      set_msg(err);
+    for (var i = 0; i < diff_encrypts.length; i++) {
+      targetFileURL = private_url + "private_bob_binary.txt";
+      try {
+        var file = await getFile(
+          targetFileURL,               // File in Pod to Read
+          { fetch: session.fetch }       // fetch from authenticated session
+        );
+        var bin_nums = ""
+        bin_nums += await new Response(file).text();
+        bin_str = binify(diff_encrypts[i], bin_nums);
+        var name_and_contents = get_string(bin_str);
+        console.log(name_and_contents);
+        if (name_and_contents.includes('.ttl')) {
+          var file_name = name_and_contents.substr(0, name_and_contents.indexOf('.ttl') + 4)
+          var contents = name_and_contents.replace(file_name, '')
+  
+          targetFileURL = private_url + file_name;
+          writeToFile(targetFileURL, contents, "text/turtle");
+        }
+      } catch(err) {
+        set_msg(err);
+      }
     }
 
     readSolidURL();
