@@ -144,8 +144,8 @@ import {
           solid_url,               // File in Pod to Read
           { fetch: session.fetch }       // fetch from authenticated session
         );
-        var str = `Fetched a ${getContentType(file)} file from ${solid_url}.<br>`;
-        str += `The file is ${isRawData(file) ? "not " : ""}a dataset.<br>`;
+        var str = `Fetched a ${getContentType(file)} file from ${solid_url}.`;
+        str += `The file is ${isRawData(file) ? "not " : ""}a dataset.`;
         str += await new Response(file).text()
         document.getElementById("results").innerHTML = str;
 
